@@ -1,10 +1,34 @@
-#include <iostream>
+#include "ns3/netanim-module.h"
+#include "ns3/node-container.h"
+#include "ns3/mobility-module.h"
+#include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/internet-module.h"
+#include "ns3/point-to-point-module.h"
+#include "ns3/applications-module.h"
+#include "ns3/animation-interface.h"
+#include "ns3/flow-monitor-module.h"
+
+#include "hleach.h"
+#include "const.h" 
+
 #include <vector>
+<<<<<<< HEAD
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
 #include <time.h>
+=======
+#include <stdio.h>  
+#include <stdlib.h>  
+#include <math.h>  
+#include <ctype.h>  
+#include <string.h>  
+#include <time.h>  
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
 #include <iterator>
+
+#include <iostream>
 #include <fstream>
 
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
@@ -19,6 +43,7 @@ using std::vector;
 
 #define MIN_ENERGY_THRESHOLD 5.0  // Minimum energy level
 #define MIN_FAULT_TOLERANCE_PERCENTAGE 10  // Fault tolerance percentage (10% of total nodes)
+#define FALSE 0
 
 int NUM_NODES = 50;    // number of nodes in the network    
                        // default is 50  
@@ -143,7 +168,7 @@ struct clusterHead {
             //initiateRecovery();
         }
     }
-}
+};
   
   
 struct sensor BASE_STATION;  
@@ -176,7 +201,10 @@ struct network_stats{
 
 class MobileWSN {
     public:
+<<<<<<< HEAD
     struct sensor *network_LEACH;
+=======
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
     int closest = 0;
 
     int round = 0;                  // current round  
@@ -207,12 +235,20 @@ class MobileWSN {
 
 	vector<double> dir;
 
+<<<<<<< HEAD
     network_LEACH = new struct sensor[NUM_NODES];
 
     AVE_ENERGY = averageEnergy(network_LEACH);
 	(*new_network_stats).LEACH_threshold = threshold;
 
     MobileWSN(const struct sensor network[]) {
+=======
+    struct sensor *network_LEACH = new struct sensor[NUM_NODES];
+
+    double AVE_ENERGY = averageEnergy(network_LEACH);
+
+    MobileWSN(const struct sensor network[], struct network_stats * new_network_stats) {
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
         for(int i = 0; i < NUM_NODES; i++) {
             network_LEACH[i].bPower = network[i].bPower;      
             network_LEACH[i].xLoc = network[i].xLoc;  
@@ -229,13 +265,21 @@ class MobileWSN {
         }
     }
 
+<<<<<<< HEAD
     void clusterHeadSelection() {
+=======
+    void clusterHeadSelection(struct network_stats * new_network_stats) {
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
         cluster_head_count = 0;
         NUM_DEAD_NODE = 0;  
         // advertisement phase  
         // we determine which nodes will be cluster heads
         //   
+<<<<<<< HEAD
         for(i = 0; i < NUM_NODES; i++){  
+=======
+        for(int i = 0; i < NUM_NODES; i++){  
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
                 if((network_LEACH[i].round + recent_round < round) || (network_LEACH[i].round == 0)){  
                     if(network_LEACH[i].head != DEAD_NODE){  
                     random_number = .00001*(rand() % 100000);          
@@ -268,7 +312,11 @@ class MobileWSN {
         // transmit energy, during this period the other nodes must   
         // keep their receivers on - which has an energy cost, again   
         // this is constant  
+<<<<<<< HEAD
         for(i = 0; i  < NUM_NODES; i++){  
+=======
+        for(int i = 0; i  < NUM_NODES; i++){  
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
             if(network_LEACH[i].head == -1){  
                 network_LEACH[i].bCurrent -=   
                     computeEnergyTransmit(LEACH_AD_DISTANCE,  
@@ -282,7 +330,11 @@ class MobileWSN {
     }
 
     void clusterSetUp() {
+<<<<<<< HEAD
         for(i = 0; i  < NUM_NODES; i++){  
+=======
+        for(int i = 0; i  < NUM_NODES; i++){  
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
             closest = -1;
             if (network_LEACH[i].head < 0 || network_LEACH[i].head >= NUM_NODES) continue;    
             if((network_LEACH[i].head != -1) &&   
@@ -291,7 +343,11 @@ class MobileWSN {
                     // current round, the node is not a cluster  
                     // head and we must find a cluster head for  
                     // the node to transmit to  
+<<<<<<< HEAD
             for(k = 0; k < NUM_NODES; k++){  
+=======
+            for(int k = 0; k < NUM_NODES; k++){  
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
                         if(network_LEACH[k].head == -1 && closest != -1){  
                             distance_X_old = network_LEACH[i].xLoc - network_LEACH[closest].xLoc;  
                             distance_Y_old = network_LEACH[i].yLoc - network_LEACH[closest].yLoc;  
@@ -313,14 +369,22 @@ class MobileWSN {
         }
         
     }
+<<<<<<< HEAD
         for(i = 0; i < NUM_NODES; i++){ 
+=======
+        for(int i = 0; i < NUM_NODES; i++){ 
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
             network_LEACH[i].V_head[round] = network_LEACH[i].head;
             network_LEACH[i].V_cluster_members[round] = network_LEACH[i].cluster_members;  
         }
     }
 
     void scheduleCreation() {
+<<<<<<< HEAD
         for(i = 0; i < NUM_NODES; i++){  
+=======
+        for(int i = 0; i < NUM_NODES; i++){  
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
             if(network_LEACH[i].head == -1){  
                 // if the node is going to be a cluster head, it transmits   
                 // the schedule to the other nodes  
@@ -334,7 +398,11 @@ class MobileWSN {
     }
 
     void dataTransmission() {
+<<<<<<< HEAD
         for(i = 0; i < NUM_NODES; i++){ 
+=======
+        for(int i = 0; i < NUM_NODES; i++){ 
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
 
             network_LEACH[i].lPeriods++;
 
@@ -361,7 +429,11 @@ class MobileWSN {
         }  
       
       
+<<<<<<< HEAD
         for(i = 0; i < NUM_NODES; i++){  
+=======
+        for(int i = 0; i < NUM_NODES; i++){  
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
             if (network_LEACH[i].head < 0 || network_LEACH[i].head >= NUM_NODES) continue;
             if(network_LEACH[i].head == -1){  
 
@@ -383,8 +455,13 @@ class MobileWSN {
         // round has completed, increment the round count
     }
 
+<<<<<<< HEAD
     void updateRoundStats() {
         for(i = 0; i < NUM_NODES; i++){  
+=======
+    void updateRoundStats(struct network_stats *new_network_stats) {
+        for(int i = 0; i < NUM_NODES; i++){  
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
             network_LEACH[i].V_bPower[round] = network_LEACH[i].bCurrent;
             network_LEACH[i].cluster_members = 0;  
            if(network_LEACH[i].bCurrent > 0.0)
@@ -474,9 +551,13 @@ int main(int argc, char * argv[])
         network_stats_data[i].NETWORK_Y = NETWORK_Y;
         network_stats_data[i].NUM_NODES = NUM_NODES;
 
+<<<<<<< HEAD
         network_stats_data[i].LEACH_ROUNDS = rounds_LEACH;
         network_stats_data[i].LEACH_NEW_ROUNDS = rounds_LEACH_NEW;
         network_stats_data[i].DIRECT_ROUNDS = rounds_DIRECT;
+=======
+        network_stats_data[i].LEACH_NEW_ROUNDS = rounds_LEACH_NEW;
+>>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
         network_stats_data[i].CLUSTER_PERCENT = CLUSTER_PERCENT;
 
         // if(i < TRIALS - 1){
