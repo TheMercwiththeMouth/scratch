@@ -6,12 +6,12 @@ Upload all the files to the scratch folder of the ns-3.43 directory. Run the fol
 ./ns3 clean
 ./ns3 configure
 ```
-### What to Run?
+### What to Run to simulate LEACH?
 For the project, we are currently using leach_new for the implementation of the LEACH protocol. Navigate to the ns-3.43 directory and run the following command:
 ```
 ./ns3 run leach_new
 ```
-### Current Output
+### Current Output of _leach_new.cc_
 ```
 Running Main Function:
 sensor
@@ -52,3 +52,6 @@ The LEACH simulation was able to remain viable for 40000 rounds
 The direct transmission simulation was able to remain viable for 1 rounds
 This is an improvement of 99.997500%
 ```
+
+### Current Files is Use
+For the project, we are currently using mwsn.cc for the implementation of the Fault Node Recovery protocol. As of now, the following phase is under implementation: _Detection of the Faulty Node Cluster_
