@@ -71,6 +71,7 @@ int MESSAGE_LENGTH = 8;
 int TRIALS = 1;
 
 string CHANGE = "Mod_CLUSTER_PERCENT0_3";
+struct clusterHead;
   
 struct sensor {
     int id;           // unique identifier for the sensor
@@ -85,55 +86,67 @@ struct sensor {
     double pAverage;
     bool isFaulty;    // Flag to indicate if the node is faulty 
 
-    int round;         // the last round that the sensor   
-            // served as a cluster head  
-    int head;  // stores the index of the cluster head   
-            // for the sensor to transmit to, set to -1 if the   
-            // sensor is a cluster head  
-    int cluster_members;   // stores the total number of nodes in   
-            // the cluster, applicable only for   
-            // cluster head nodes  
-    int head_count;        // this contains the count of the   
-                        // number of times a sensor has been   
-                        // the head of a cluster, can be   
-                        // removed for optimization later  
+    // int round;         // the last round that the sensor   
+    //         // served as a cluster head  
+    
+    clusterHead* head;  // stores the cluster head   
+            // for the sensor to transmit to
+
+    // int cluster_members;   // stores the total number of nodes in   
+    //         // the cluster, applicable only for   
+    //         // cluster head nodes  
+
+    // int head_count;        // this contains the count of the   
+    //                     // number of times a sensor has been   
+    //                     // the head of a cluster, can be   
+    //                     // removed for optimization later  
+
     double distance_BASE;
     double distance_current_head;
 
-    int V_round[TOTAL_ROUNDS];
+    // int V_round[TOTAL_ROUNDS];
+    
     double V_bPower[TOTAL_ROUNDS];
-    int V_head[TOTAL_ROUNDS];
+
+    // int V_head[TOTAL_ROUNDS];
+
     int V_cluster_members[TOTAL_ROUNDS];
-    double V_distanceToHead[TOTAL_ROUNDS];
+
+    // double V_distanceToHead[TOTAL_ROUNDS];
+
+    sensor () {}
 
     void updateFaultStatus() {
         if (bCurrent <= MIN_ENERGY_THRESHOLD) {
             if (!isFaulty) {
                 isFaulty = true;
+                if (head) {
+                    head->updateFaultNodeCount();
+                }
                 cout << "Node " << id << " declared as FAULTY in Cluster " << clusterId << endl;
             }
         }
     }
 };
 
-struct clusterHead {
-    int clusterId;
+struct clusterHead : public sensor {
+
     vector<sensor*> members;
     int faultNodeCount;
+    double totalNodes;
+    double faultPercentage;
 
-    clusterHead(int id) : clusterId(id), faultNodeCount(0) {}
-
+    clusterHead() {
+        members = {};
+        totalNodes = members.size();
+        faultNodeCount = 0;
+        faultPercentage = 0.0;
+    }
+    
     void updateFaultNodeCount() {
-        faultNodeCount = 0;  // Reset count before checking
-
-        for (auto &node : members) {
-            if(node->isFaulty) {
-                faultNodeCount++;
-            }
-        }
-
-        double totalNodes = members.size();
-        double faultPercentage = (faultNodeCount / totalNodes) * 100.0;
+        
+        faultNodeCount++;  
+        faultPercentage = (faultNodeCount / totalNodes) * 100.0;
     }
 }
   
