@@ -1,12 +1,16 @@
 #include <iostream>
 #include <vector>
 #include <stdlib.h>
-#include <nath.h>
+#include <math.h>
 #include <string.h>
 #include <time.h>
 #include <iterator>
 #include <fstream>
 #include <delaunator.hpp>
+#include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/mobility-module.h"
+#include "ns3/netanim-module.h"
 
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #pragma GCC diagnostic ignored "-Wunused-variable"
@@ -21,11 +25,11 @@ using std::vector;
 #define MIN_ENERGY_THRESHOLD 5.0  // Minimum energy level
 #define MIN_FAULT_TOLERANCE_PERCENTAGE 10  // Fault tolerance percentage (10% of total nodes)
 
-int NUM_NODES = 500;    // number of nodes in the network    
+int NUM_NODES = 10;    // number of nodes in the network    
                        // default is 50  
-int NETWORK_X = 500;   // X-size of network  
+int NETWORK_X = 100;   // X-size of network  
                        // default is 100  
-int NETWORK_Y = 500;   // Y-size of network  
+int NETWORK_Y = 100;   // Y-size of network  
                 // default is 100  
 double B_POWER = 0.5;   // initial battery power of sensors  
                 // default is 0.75  
@@ -144,7 +148,7 @@ struct sensor {
     double bCurrent;       // current battery power  
     double bPower;     // initial battery power 
     double pAverage;
-    bool isFaulty;    // Flag to indicate if the node is faulty 
+    bool isFaulty = false;    // Flag to indicate if the node is faulty 
 
     // int round;         // the last round that the sensor   
     //         // served as a cluster head  
@@ -176,18 +180,12 @@ struct sensor {
 
     sensor () {}
 
-    void updateFaultStatus() {
-        if (bCurrent <= MIN_ENERGY_THRESHOLD) {
-            if (!isFaulty) {
-                isFaulty = true;
-                if (head) {
-                    head->updateFaultNodeCount(this);
-                }
-                cout << "Node " << id << " declared as FAULTY in Cluster " << clusterId << endl;
-            }
-        }
-    }
+    void updateFaultStatus();
+
+    
 };
+
+struct sensor BASE_STATION;  
 
 struct clusterHead : public sensor {
 
@@ -195,7 +193,7 @@ struct clusterHead : public sensor {
     vector<sensor*> faulty;
     vector<vector<double>>hole_table;
     int faultNodeCount;
-    double totalNodes;
+    double totalNodes=0;
     double faultPercentage;
     vector<double> coords;
 
@@ -212,7 +210,7 @@ struct clusterHead : public sensor {
     bool checkForHole() {
         
 
-        if(!coords){
+        if(coords.empty()){
             for(auto &node : members){
                 coords.push_back(node->xLoc);
                 coords.push_back(node->yLoc);
@@ -260,9 +258,22 @@ struct clusterHead : public sensor {
     }
     
 }
+
+
+void sensor::updateFaultStatus() {
+        if (bCurrent <= MIN_ENERGY_THRESHOLD) {
+            if (!isFaulty) {
+                isFaulty = true;
+                if (head) {
+                    head->updateFaultNodeCount(this);
+                }
+                cout << "Node " << id << " declared as FAULTY in Cluster " << clusterId << endl;
+            }
+        }
+    }
   
   
-struct sensor BASE_STATION;  
+sensor BASE_STATION(0, 0, 50, 50);
 
 struct network_stats{
     int BASE_STATION_X;
@@ -289,3 +300,101 @@ struct network_stats{
     int LEACH_NEW_num_cluster_head[TOTAL_ROUNDS];
     double LEACH_NEW_percent_head[TOTAL_ROUNDS];
 };
+
+int main(int argc, char * argv[]){
+    cout << "main" << endl;
+    srand(time(0)); // Seed random generator
+    NodeContainer nodes;
+    ns3Nodes.Create(28);
+    
+    struct sensor *sensors = new struct sensor[18];
+    struct clusterHead *CHs = new struct clusterHead[9];
+    
+    initializeNetwork(sensors,CHs)
+    ns3::AnimationInterface anim("mwsn.xml");
+    int i = 0;
+    vector<tuple<int, uint8_t, uint8_t, uint8_t>> clusterColors = {
+        {1, 0, 255, 0}, {2, 0, 0, 255}, {3, 255, 255, 0}, {4, 255, 165, 0}, {5, 128, 0, 128},
+        {6, 255, 192, 203}, {7, 0, 255, 255}, {8, 128, 128, 0}, {9, 139, 69, 19}
+    };
+    for (; i < 18; i++) {
+        anim.SetConstantPosition(nodes.Get(i), sensors[i].xLoc, sensors[i].yLoc);
+        for (const auto& [clusterId, r, g, b] : clusterColors) {
+                if (sensors[i].clusterId == clusterId) {
+                    anim.UpdateNodeColor(i, r, g, b);
+                    break;
+                }
+            }
+        cout<<i<<" - "<<sensors[i].xLoc<<" - "<<sensors[i].yLoc<<endl;
+    }
+    for (int j = 0; j < 9; j++){
+        anim.SetConstantPosition(nodes.Get(i), CHs[j].xLoc, CHs[j].yLoc);
+        anim.UpdateNodeColor(i,0,0,0);
+        cout<<i<<" - "<<CHs[j].xLoc<<" - "<<CHs[j].yLoc<<endl;
+        i++;
+    }
+    
+
+    
+
+
+}
+
+void initializeNetwork(struct sensor sensors[], struct clusterHead CHs[]) {  
+
+    int i = 0;  
+    srand((unsigned int) time(0));
+    double distance_X_new =0.0;
+    double distance_Y_new =0.0;
+    double distance_new =0.0;
+    int curr_id = 1;
+    int sensor_ctr = 0;
+    int cluster_id = 1;
+    for(i = 0; i < 9; i++) {  
+                CHs[i].id = curr_id;
+                CHs[i].clusterId = cluster_id;
+                curr_id++;
+                CHs[i].xLoc = rand() % NETWORK_X;  
+                CHs[i].yLoc = rand() % NETWORK_Y;
+
+                distance_X_new = CHs[i].xLoc - BASE_STATION.xLoc;  
+            	distance_Y_new = CHs[i].yLoc - BASE_STATION.yLoc;  
+            	distance_new = sqrt(pow(distance_X_new, 2) + pow(distance_Y_new, 2));  
+
+            	CHs[i].distance_BASE = distance_new;
+
+                CHs[i].lPeriods = 0;  
+                CHs[i].bCurrent = B_POWER;  
+                CHs[i].bPower = B_POWER;  
+                CHs[i].head = &CHs[i];
+                CHs[i].distance_current_head = 0;
+                for (int j = 0; j < 2; j++) {
+                    sensors[sensor_ctr].id = curr_id;
+                    sensors[sensor_ctr].clusterId = cluster_id;
+                    curr_id++;
+                    sensors[sensor_ctr].xLoc = CHs[i].xLoc + rand()%11;
+                    sensors[sensor_ctr].yLoc = CHs[i].yLoc + rand()%11;
+                    distance_X_new = sensors[sensor_ctr].xLoc - BASE_STATION.xLoc;  
+                    distance_Y_new = sensors[sensor_ctr].yLoc - BASE_STATION.yLoc;  
+                    distance_new = sqrt(pow(distance_X_new, 2) + pow(distance_Y_new, 2));
+                    sensors[sensor_ctr].distance_BASE = distance_new;
+                    sensors[sensor_ctr].lPeriods = 0;  
+                    sensors[sensor_ctr].bCurrent = B_POWER;  
+                    sensors[sensor_ctr].bPower = B_POWER;
+                    sensors[sensor_ctr].head = &CHs[i];
+                    distance_X_new = sensors[sensor_ctr].xLoc - CHs[i].xLoc;  
+                    distance_Y_new = sensors[sensor_ctr].yLoc - CHs[i].yLoc;  
+                    distance_new = sqrt(pow(distance_X_new, 2) + pow(distance_Y_new, 2));
+                    sensors[sensor_ctr].distance_current_head = distance_new;
+                    CH[i].members.push_back(&sensors[sensor_ctr]);
+                    CH[i].totalNodes++;
+                    sensor_ctr++;
+                }
+                cluster_id++;
+
+        		
+    }
+
+
+       
+}// end initializeNetwork function  
