@@ -13,22 +13,11 @@
 #include "const.h" 
 
 #include <vector>
-<<<<<<< HEAD
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
 #include <time.h>
-=======
-#include <stdio.h>  
-#include <stdlib.h>  
-#include <math.h>  
-#include <ctype.h>  
-#include <string.h>  
-#include <time.h>  
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
 #include <iterator>
-
-#include <iostream>
 #include <fstream>
 #include <delaunator.hpp>
 
@@ -44,9 +33,8 @@ using std::vector;
 
 #define MIN_ENERGY_THRESHOLD 5.0  // Minimum energy level
 #define MIN_FAULT_TOLERANCE_PERCENTAGE 10  // Fault tolerance percentage (10% of total nodes)
-#define FALSE 0
 
-int NUM_NODES = 50;    // number of nodes in the network    
+int NUM_NODES = 10;    // number of nodes in the network    
                        // default is 50  
 int NETWORK_X = 100;   // X-size of network  
                        // default is 100  
@@ -86,6 +74,8 @@ double SCHEDULE_DISTANCE = 25;
 
 int SCHEDULE_MESSAGE = 16;  
 
+double Rs = 25;
+
 int BASE_STATION_X_DEFAULT = 300;
 
 int BASE_STATION_Y_DEFAULT = 300;  
@@ -95,6 +85,63 @@ int DEAD_NODE = -2;
 int MESSAGE_LENGTH = 8;
 
 int TRIALS = 1;
+
+//utilit functions for coverage hole detection
+
+double computeCircumradius(const pair<double, double>& A, 
+                           const pair<double, double>& B, 
+                           const pair<double, double>& C) {
+    double a = hypot(B.first - C.first, B.second - C.second);
+    double b = hypot(A.first - C.first, A.second - C.second);
+    double c = hypot(A.first - B.first, A.second - B.second);
+    double s = (a + b + c) / 2.0;
+    double area = sqrt(s * (s - a) * (s - b) * (s - c));
+    return (a * b * c) / (4.0 * area);
+}
+
+bool isObtuseTriangle(double a, double b, double c) {
+    return (a * a + b * b < c * c) || (b * b + c * c < a * a) || (c * c + a * a < b * b);
+}
+
+double distance(double x1, double y1, double x2, double y2) {
+    return hypot(x1 - x2, y1 - y2);
+}
+
+bool isFullyCovered(double x1, double y1, double x2, double y2, double x3, double y3, double rs) {
+    double side[3];
+    side[0] = distance(x1, y1, x2, y2); // Side between (x1,y1) and (x2,y2)
+    side[1] = distance(x3, y3, x2, y2); // Side between (x3,y3) and (x2,y2)
+    side[2] = distance(x1, y1, x3, y3); // Side between (x1,y1) and (x3,y3)
+
+    // Find the index of the longest side
+    int maxid = 0;
+    if (side[1] > side[maxid]) maxid = 1;
+    if (side[2] > side[maxid]) maxid = 2;
+
+    // Calculate angles opposite the two shorter sides using the Law of Cosines
+    double angle[2];
+    angle[0] = acos((side[maxid] * side[maxid] + side[(maxid + 1) % 3] * side[(maxid + 1) % 3] - side[(maxid + 2) % 3] * side[(maxid + 2) % 3]) / (2 * side[maxid] * side[(maxid + 1) % 3]));
+    angle[1] = acos((side[maxid] * side[maxid] + side[(maxid + 2) % 3] * side[(maxid + 2) % 3] - side[(maxid + 1) % 3] * side[(maxid + 1) % 3]) / (2 * side[maxid] * side[(maxid + 2) % 3]));
+
+    // Calculate perpendicular bisector lengths
+    double pbl[2];
+    pbl[0] = tan(angle[0]) * (side[(maxid + 1) % 3] / 2);
+    pbl[1] = tan(angle[1]) * (side[(maxid + 2) % 3] / 2);
+
+    // Calculate lengths from midpoint to circumcenter
+    double length[2];
+    length[0] = sqrt(pbl[0] * pbl[0] + (side[(maxid + 1) % 3] / 2) * (side[(maxid + 1) % 3] / 2));
+    length[1] = sqrt(pbl[1] * pbl[1] + (side[(maxid + 2) % 3] / 2) * (side[(maxid + 2) % 3] / 2));
+
+    // Check if either length exceeds the radius rs
+    if (length[0] > rs || length[1] > rs) {
+        return true; // Triangle is NOT fully covered
+    } else {
+        return false; // Triangle is fully covered
+    }
+}
+
+
 
 string CHANGE = "Mod_CLUSTER_PERCENT0_3";
 struct clusterHead;
@@ -147,7 +194,7 @@ struct sensor {
             if (!isFaulty) {
                 isFaulty = true;
                 if (head) {
-                    head->updateFaultNodeCount();
+                    head->updateFaultNodeCount(this);
                 }
                 cout << "Node " << id << " declared as FAULTY in Cluster " << clusterId << endl;
             }
@@ -155,47 +202,79 @@ struct sensor {
     }
 };
 
+struct sensor BASE_STATION;  
+
 struct clusterHead : public sensor {
 
     vector<sensor*> members;
+    vector<sensor*> faulty;
+    vector<vector<double>>hole_table;
     int faultNodeCount;
     double totalNodes;
     double faultPercentage;
+    vector<double> coords;
 
-    clusterHead() {
-        members = {};
-        totalNodes = members.size();
-        faultNodeCount = 0;
-        faultPercentage = 0.0;
-    }
+    clusterHead() {}
+
     
-    void updateFaultNodeCount() {
-<<<<<<< HEAD
-        faultNodeCount = 0;  // Reset count before checking
-
-        for (auto &node : members) {
-            if(node->isFaulty) {
-                faultNodeCount++;
-            }
-        }
-    }
-
-    void faultAreaDetection() {
-        double totalNodes = members.size();
-        double faultPercentage = (faultNodeCount / totalNodes) * 100.0;
-
-        if (faultPercentage >= MIN_FAULT_TOLERANCE_PERCENTAGE) {
-            cout << "[ALERT] Cluster " << clusterId << " exceeds " << MIN_FAULT_TOLERANCE_PERCENTAGE 
-                 << "% faulty nodes! Initiating recovery...\n";
-            //initiateRecovery();
-        }
-=======
-        
+    void updateFaultNodeCount(sensor* faultNode) {
+        faulty.push_back(faultNode);
         faultNodeCount++;  
         faultPercentage = (faultNodeCount / totalNodes) * 100.0;
->>>>>>> 1d3415f (changes to sensor and clusterHead struct functions)
+        if(faultNodeCount > 2) cout<<"Hole: " << checkForHole();
     }
-};
+
+    bool checkForHole() {
+        
+
+        if(!coords){
+            for(auto &node : members){
+                coords.push_back(node->xLoc);
+                coords.push_back(node->yLoc);
+            }
+        }
+        
+        delaunator::Delaunator d(coords);
+        vector<vector<double>> triangles;
+        for(std::size_t i = 0; i < d.triangles.size(); i+=3) {
+            vector<double>triangle;
+            triangle.push_back(d.coords[2 * d.triangles[i]]);
+            triangle.push_back(d.coords[2 * d.triangles[i] + 1]);
+            triangle.push_back(d.coords[2 * d.triangles[i + 1]]);
+            triangle.push_back(d.coords[2 * d.triangles[i + 1] + 1]);
+            triangle.push_back(d.coords[2 * d.triangles[i + 2]]);
+            triangle.push_back(d.coords[2 * d.triangles[i + 2] + 1]);
+            triangles.push_back(triangle);
+        }
+        for(auto triangle: triangles){
+            pair <double,double> A,B,C;
+            double a, b c;
+            double Rc;
+            A = {triangle[0],triangle[1]};
+            B = {triangle[2],triangle[3]};
+            C = {triangle[4],triangle[5]};
+            Rc = computeCircumradius(A, B, C);
+            if(Rc > Rs){
+                a = distance(B[0], B[1], C[0], C[1]);
+                b = distance(A[0], A[1], C[0], C[1]);
+                C = distance(A[0], A[1], B[0], B[1]);
+
+                if(isObtuseTriangle(a,b,c)){
+                    if(!isFullyCovered(A[0],A[1],B[0],B[1],C[0],C[1],Rs)){
+                        hole_table.push_back(A[0],A[1],B[0],B[1],C[0],C[1]);
+                    }
+                }
+                else{
+                    hole_table.push_back(A[0],A[1],B[0],B[1],C[0],C[1]);
+                }
+            }
+
+        
+        }
+
+    }
+    
+}
   
   
 struct sensor BASE_STATION;  
@@ -225,467 +304,3 @@ struct network_stats{
     int LEACH_NEW_num_cluster_head[TOTAL_ROUNDS];
     double LEACH_NEW_percent_head[TOTAL_ROUNDS];
 };
-
-class MobileWSN {
-    public:
-<<<<<<< HEAD
-    struct sensor *network_LEACH;
-=======
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-    int closest = 0;
-
-    int round = 0;                  // current round  
-	int failed_transmit = 0;        // round where a failed transmission occurred  
-	  
-	int testing = 0;            // testing variable, TO BE REMOVED  
-	int bits_transmitted = 0;       // count of bits transmitted  
-	int power = FALSE;  
-	int temp_cluster_members = 0;  
-	  
-	double average_energy = 0.0;  
-	double distance_X_old = 0.0;  
-	double distance_Y_old = 0.0;  
-	double distance_old = 0.0;  
-	double distance_X_new = 0.0;  
-	double distance_Y_new = 0.0;  
-	double distance_new = 0.0;  
-	int recent_round = static_cast<int>(1.0 / CLUSTER_PERCENT);  
-	double threshold = CLUSTER_PERCENT/(1-(CLUSTER_PERCENT*(round % recent_round)));
-	double random_number;  
-	int cluster_head_count = 0;  
-	double percent_head = 0.0; 
-	double mid_value = 0.0;
-	bool flag = 1 ;
-	int NUM_DEAD_NODE = 0;
-
-	double AVE_ENERGY = 0;
-
-	vector<double> dir;
-
-<<<<<<< HEAD
-    network_LEACH = new struct sensor[NUM_NODES];
-
-    AVE_ENERGY = averageEnergy(network_LEACH);
-	(*new_network_stats).LEACH_threshold = threshold;
-
-    MobileWSN(const struct sensor network[]) {
-=======
-    struct sensor *network_LEACH = new struct sensor[NUM_NODES];
-
-    double AVE_ENERGY = averageEnergy(network_LEACH);
-
-    MobileWSN(const struct sensor network[], struct network_stats * new_network_stats) {
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-        for(int i = 0; i < NUM_NODES; i++) {
-            network_LEACH[i].bPower = network[i].bPower;      
-            network_LEACH[i].xLoc = network[i].xLoc;  
-            network_LEACH[i].cluster_members = 0;  
-            network_LEACH[i].yLoc = network[i].yLoc;   
-            network_LEACH[i].bCurrent = network[i].bCurrent;     
-
-            //statistic
-            network_LEACH[i].V_round[round] = 0;
-            network_LEACH[i].V_bPower[round] = network[i].bPower;
-            network_LEACH[i].V_cluster_members[round] = 0;
-            network_LEACH[i].V_head[round] = -3;
-            network_LEACH[i].V_distanceToHead[round] = 0;
-        }
-    }
-
-<<<<<<< HEAD
-    void clusterHeadSelection() {
-=======
-    void clusterHeadSelection(struct network_stats * new_network_stats) {
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-        cluster_head_count = 0;
-        NUM_DEAD_NODE = 0;  
-        // advertisement phase  
-        // we determine which nodes will be cluster heads
-        //   
-<<<<<<< HEAD
-        for(i = 0; i < NUM_NODES; i++){  
-=======
-        for(int i = 0; i < NUM_NODES; i++){  
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-                if((network_LEACH[i].round + recent_round < round) || (network_LEACH[i].round == 0)){  
-                    if(network_LEACH[i].head != DEAD_NODE){  
-                    random_number = .00001*(rand() % 100000);          
-                    //cout << "random_number " << random_number << endl;
-                        if(random_number <= threshold && network_LEACH[i].bCurrent > 0.03){  
-                            // the random number selected is less   
-                            // than the threshold so the node becomes   
-                            // a cluster head for the round  
-                            network_LEACH[i].head_count++;
-                            // update the round variable   
-                            // so we know that this sensor was   
-                            // last a cluster head at round i  
-                            network_LEACH[i].round = round;  
-                            network_LEACH[i].head = -1;
-
-                            // store the index of the node in the   
-                            // cluster_heads array  
-                            // increment the cluster_head_count  
-                            cluster_head_count++; 
-                        }  
-                    }  
-                }
-
-        } 
-            
-        (*new_network_stats).LEACH_NEW_num_cluster_head[round] = cluster_head_count;
-        (*new_network_stats).LEACH_NEW_percent_head[round] = ((double)cluster_head_count/(double)NUM_NODES);
-        // now the cluster heads must transmit the fact that they   
-        // are cluster heads to the network, this will be a constant   
-        // transmit energy, during this period the other nodes must   
-        // keep their receivers on - which has an energy cost, again   
-        // this is constant  
-<<<<<<< HEAD
-        for(i = 0; i  < NUM_NODES; i++){  
-=======
-        for(int i = 0; i  < NUM_NODES; i++){  
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-            if(network_LEACH[i].head == -1){  
-                network_LEACH[i].bCurrent -=   
-                    computeEnergyTransmit(LEACH_AD_DISTANCE,  
-                                LEACH_AD_MESSAGE);  
-            }  
-            else{  
-                network_LEACH[i].bCurrent -=   
-                    computeEnergyReceive(LEACH_AD_MESSAGE);  
-            }  
-        }  
-    }
-
-    void clusterSetUp() {
-<<<<<<< HEAD
-        for(i = 0; i  < NUM_NODES; i++){  
-=======
-        for(int i = 0; i  < NUM_NODES; i++){  
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-            closest = -1;
-            if (network_LEACH[i].head < 0 || network_LEACH[i].head >= NUM_NODES) continue;    
-            if((network_LEACH[i].head != -1) &&   
-                network_LEACH[i].head != DEAD_NODE){  
-                    // if the node's round is not equal to the    
-                    // current round, the node is not a cluster  
-                    // head and we must find a cluster head for  
-                    // the node to transmit to  
-<<<<<<< HEAD
-            for(k = 0; k < NUM_NODES; k++){  
-=======
-            for(int k = 0; k < NUM_NODES; k++){  
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-                        if(network_LEACH[k].head == -1 && closest != -1){  
-                            distance_X_old = network_LEACH[i].xLoc - network_LEACH[closest].xLoc;  
-                            distance_Y_old = network_LEACH[i].yLoc - network_LEACH[closest].yLoc;  
-                            distance_old = sqrt(pow(distance_X_old, 2) + pow(distance_Y_old, 2));  
-                            distance_X_new = network_LEACH[i].xLoc - network_LEACH[k].xLoc;  
-                            distance_Y_new = network_LEACH[i].yLoc - network_LEACH[k].yLoc;  
-                            distance_new = sqrt(pow(distance_X_new, 2) + pow(distance_Y_new, 2));  
-                            if(distance_new < distance_old)  
-                                closest = k;  
-                        }  
-                        else if(network_LEACH[k].head == -1 && closest == -1){  
-                            closest = k;  
-                        }  
-            }  
-            
-            if (closest == -1) continue;  
-            network_LEACH[i].head = closest;  
-            network_LEACH[closest].cluster_members++;  
-        }
-        
-    }
-<<<<<<< HEAD
-        for(i = 0; i < NUM_NODES; i++){ 
-=======
-        for(int i = 0; i < NUM_NODES; i++){ 
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-            network_LEACH[i].V_head[round] = network_LEACH[i].head;
-            network_LEACH[i].V_cluster_members[round] = network_LEACH[i].cluster_members;  
-        }
-    }
-
-    void scheduleCreation() {
-<<<<<<< HEAD
-        for(i = 0; i < NUM_NODES; i++){  
-=======
-        for(int i = 0; i < NUM_NODES; i++){  
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-            if(network_LEACH[i].head == -1){  
-                // if the node is going to be a cluster head, it transmits   
-                // the schedule to the other nodes  
-                network_LEACH[i].bCurrent -=   
-                    computeEnergyTransmit(SCHEDULE_DISTANCE, SCHEDULE_MESSAGE);  
-            }  
-            else  
-                network_LEACH[i].bCurrent -=   
-                    computeEnergyReceive(SCHEDULE_MESSAGE);  
-        }  
-    }
-
-    void dataTransmission() {
-<<<<<<< HEAD
-        for(i = 0; i < NUM_NODES; i++){ 
-=======
-        for(int i = 0; i < NUM_NODES; i++){ 
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-
-            network_LEACH[i].lPeriods++;
-
-            if(network_LEACH[i].head >=0 && network_LEACH[i].head < NUM_NODES){ 
-
-                    distance_X_new = network_LEACH[i].xLoc - network_LEACH[network_LEACH[i].head].xLoc;  
-                    distance_Y_new = network_LEACH[i].yLoc - network_LEACH[network_LEACH[i].head].yLoc;  
-                    distance_new = sqrt((pow(distance_X_new, 2) + pow(distance_Y_new, 2)));
-
-                    network_LEACH[i].V_distanceToHead[round] = (distance_new);
-
-                    if(network_LEACH[i].head != DEAD_NODE){
-                        network_LEACH[i].bCurrent -= computeEnergyTransmit(distance_new, MESSAGE_LENGTH);  
-                        network_LEACH[network_LEACH[i].head].bCurrent -= computeEnergyReceive(MESSAGE_LENGTH);
-
-                        if(network_LEACH[i].bCurrent < 0.0 && network_LEACH[i].head != -1){  
-                                network_LEACH[i].head = DEAD_NODE; 
-                            } 
-                    } 
-            }
-            else{
-                network_LEACH[i].V_distanceToHead[round] = 0;
-            }  
-        }  
-      
-      
-<<<<<<< HEAD
-        for(i = 0; i < NUM_NODES; i++){  
-=======
-        for(int i = 0; i < NUM_NODES; i++){  
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-            if (network_LEACH[i].head < 0 || network_LEACH[i].head >= NUM_NODES) continue;
-            if(network_LEACH[i].head == -1){  
-
-                double energy_enough = network_LEACH[i].bCurrent - computeEnergyTransmit(network_LEACH[i].distance_BASE, (MESSAGE_LENGTH * (network_LEACH[i].cluster_members+1)));
-            
-            //network_LEACH[i].bCurrent -= computeEnergyTransmit(distance_new,(MESSAGE_LENGTH * (network_LEACH[i].cluster_members+1)));  
-            //if(network_LEACH[i].bCurrent > 0.0){  
-                  if(energy_enough > 0.0){
-
-                    network_LEACH[i].bCurrent -= computeEnergyTransmit(network_LEACH[i].distance_BASE,(MESSAGE_LENGTH * (network_LEACH[i].cluster_members+1)));
-                    bits_transmitted += (MESSAGE_LENGTH * (network_LEACH[i].cluster_members+1));  
-                 }  
-                else
-                {  
-                    failed_transmit++;    
-                }  
-            }  
-        }   
-        // round has completed, increment the round count
-    }
-
-<<<<<<< HEAD
-    void updateRoundStats() {
-        for(i = 0; i < NUM_NODES; i++){  
-=======
-    void updateRoundStats(struct network_stats *new_network_stats) {
-        for(int i = 0; i < NUM_NODES; i++){  
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-            network_LEACH[i].V_bPower[round] = network_LEACH[i].bCurrent;
-            network_LEACH[i].cluster_members = 0;  
-           if(network_LEACH[i].bCurrent > 0.0)
-           {
-                   network_LEACH[i].head = -3;  
-           }
-           else
-           {
-                   network_LEACH[i].head = DEAD_NODE;
-                   NUM_DEAD_NODE++;		       		
-           }
-          network_LEACH[i].V_round[round] = round;
-        }
-
-       
-        (*new_network_stats).LEACH_NEW_rounds[round] = round;
-
-
-        (*new_network_stats).LEACH_NEW_num_dead_node[round] = NUM_DEAD_NODE; 
-        
-
-        cluster_head_count = 0;  
-
-        AVE_ENERGY = averageEnergy(network_LEACH);
-
-        (*new_network_stats).LEACH_NEW_network_average_energy[round] = AVE_ENERGY;
-        (*new_network_stats).LEACH_NEW_network_total_energy[round] = totalEnergy(network_LEACH);
-
-        if(round % 5000 == 1 )
-        {
-            cout  << "network_pwr: " << AVE_ENERGY << endl;	
-        }
-
-        round += 1;
-    }
-
-};
-
-double computeEnergyTransmit(float distance, int messageLength);    
-  
-double computeEnergyReceive(int messageLength);  
-  
-void initializeNetwork(struct sensor network[]);  
-  
-double averageEnergy(struct sensor network[]);  
-  
-double totalEnergy(struct sensor network[]);
-
-int runLeachSimulation_New(const struct sensor network[], struct network_stats * new_network_stats); 
-
-void initializeNetworkStats(struct network_stats network_stats_data[], int TRIALS);
-
-int main(int argc, char * argv[])  
-{  
-    cout << "Running Main Function:" << endl;
-	struct sensor *network = new struct sensor[NUM_NODES];
-    cout << "Creating the Sensor Network " << endl;
-
-    TRIALS = 1;
-
-    struct network_stats * network_stats_data = new struct network_stats[TRIALS];
-      
-    int i = 0;  
-
-    int rounds_LEACH_NEW = 0;
-
-    BASE_STATION.xLoc = BASE_STATION_X_DEFAULT;  
-    BASE_STATION.yLoc = BASE_STATION_Y_DEFAULT;
-
-      
-    initializeNetwork(network);  
-    cout << "Intializing the Network: " << endl;    
-    
-	initializeNetworkStats(network_stats_data,TRIALS);
-    cout << "Initializing Network Stats: " << endl;
-
-  
-    for(i = 0; i < TRIALS; i++){  
-        rounds_LEACH_NEW = runLeachSimulation_New(network,&network_stats_data[i]);
-        cout << "The LEACH Simulation has been COMPLETED." << endl;   
-		 
-        printf("\n");
-        printf("The LEACH simulation was able to remain viable for %d rounds\n", rounds_LEACH_NEW);
-        network_stats_data[i].BASE_STATION_X = BASE_STATION_X_DEFAULT;
-        network_stats_data[i].BASE_STATION_Y = BASE_STATION_Y_DEFAULT;
-        network_stats_data[i].NETWORK_X = NETWORK_X;
-        network_stats_data[i].NETWORK_Y = NETWORK_Y;
-        network_stats_data[i].NUM_NODES = NUM_NODES;
-
-<<<<<<< HEAD
-        network_stats_data[i].LEACH_ROUNDS = rounds_LEACH;
-        network_stats_data[i].LEACH_NEW_ROUNDS = rounds_LEACH_NEW;
-        network_stats_data[i].DIRECT_ROUNDS = rounds_DIRECT;
-=======
-        network_stats_data[i].LEACH_NEW_ROUNDS = rounds_LEACH_NEW;
->>>>>>> ccda1d9 (Started Modularization of the LEACH Protocol Code)
-        network_stats_data[i].CLUSTER_PERCENT = CLUSTER_PERCENT;
-
-        // if(i < TRIALS - 1){
-        // 	initializeNetwork(network);  
-        // }
-        
-    }
-	ns3::Simulator::Run ();
-	ns3::Simulator::Destroy ();
-
-    return 0;    
-}
-
-
-void initializeNetwork(struct sensor network[]) {  
- 
-    int i = 0;  
-    srand((unsigned int) time(0));
-    double distance_X_new =0.0;
-    double distance_Y_new =0.0;
-    double distance_new =0.0;
-            
-    for(i = 0; i < NUM_NODES; i++) {  
-        network[i].xLoc = rand() % NETWORK_X;  
-        network[i].yLoc = rand() % NETWORK_Y;
-
-        distance_X_new = network[i].xLoc - BASE_STATION.xLoc;  
-        distance_Y_new = network[i].yLoc - BASE_STATION.yLoc;  
-        distance_new = sqrt(pow(distance_X_new, 2) + pow(distance_Y_new, 2));  
-
-        network[i].distance_BASE = distance_new;
-
-        network[i].lPeriods = 0;  
-        network[i].bCurrent = B_POWER;  
-        network[i].bPower = B_POWER;  
-        network[i].round = 0;  
-        network[i].head = -3;  
-    }  
-}
-
-void initializeNetworkStats(struct network_stats network_stats_data[],int TRIALS){
-    
-    int i = 0;
-            
-    for(i = 0; i < TRIALS; i++) {  
-        network_stats_data[i].BASE_STATION_X = 0;
-        network_stats_data[i].BASE_STATION_Y = 0;
-        network_stats_data[i].NETWORK_X = 0;
-        network_stats_data[i].NETWORK_Y = 0;
-        network_stats_data[i].NUM_NODES = 0;
-
-        network_stats_data[i].network_comparison = 0;
-        network_stats_data[i].LEACH_ROUNDS = 0;
-        network_stats_data[i].DIRECT_ROUNDS = 0;
-        network_stats_data[i].Improvement = 0;
-        network_stats_data[i].LEACH_threshold = 0;  
-
-    }
-} 
-   
-double computeEnergyTransmit(float distance, int messageLength){  
-    float E_elec = 50 * pow(10,-9);  
-    float epsilon_amp = 100 * pow(10,-12);  
-    double EnergyUse = 0.00;  
-            
-    EnergyUse = (messageLength * E_elec) + (messageLength * epsilon_amp * pow(distance,2));   
-        
-    return EnergyUse;  
-    
-}           
-              
-double computeEnergyReceive(int messageLength) {  
- 
-    return (messageLength * (50 * pow(10,-9)));  
-}           
-    
-double averageEnergy(struct sensor network[]) {  
-
-    float average = 0.0;  
-    float starting_power = 0.00;  
-    float current_power = 0.00;  
-    int i = 0;  
-    
-    for(i = 0; i < NUM_NODES; i++) {  
-        starting_power += network[i].bPower;  
-        current_power += network[i].bCurrent;  
-    }  
-    
-    return current_power/starting_power;  
-
-}          
-
-double totalEnergy(struct sensor network[]) {  
-
-    double total = 0.00;  
-    int i = 0;  
-    
-    for(i = 0; i < NUM_NODES; i++) {  
-        total += network[i].bCurrent;  
-    }  
-    
-    return total;  
-    
-}
