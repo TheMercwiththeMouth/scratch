@@ -6,7 +6,7 @@
 #include <time.h>
 #include <iterator>
 #include <fstream>
-#include <delaunator.hpp>
+#include "include/delaunator.hpp"
 #include "ns3/core-module.h"
 #include "ns3/network-module.h"
 #include "ns3/mobility-module.h"
@@ -133,6 +133,8 @@ bool isFullyCovered(double x1, double y1, double x2, double y2, double x3, doubl
 }
 
 
+void initializeNetwork(struct sensor sensors[], struct clusterHead CHs[]);
+
 
 string CHANGE = "Mod_CLUSTER_PERCENT0_3";
 struct clusterHead;
@@ -143,10 +145,10 @@ struct sensor {
 
     short xLoc;        // X-location of sensor  
     short yLoc;        // Y-location of sensor  
-    short lPeriods;        // number of periods the sensor  
+    short lPeriods = 0;        // number of periods the sensor  
             // has been in use for  
-    double bCurrent;       // current battery power  
-    double bPower;     // initial battery power 
+    double bCurrent = 0.5;       // current battery power  
+    double bPower = 0.5;     // initial battery power 
     double pAverage;
     bool isFaulty = false;    // Flag to indicate if the node is faulty 
 
@@ -181,11 +183,9 @@ struct sensor {
     sensor () {}
 
     void updateFaultStatus();
-
-    
 };
 
-struct sensor BASE_STATION;  
+
 
 struct clusterHead : public sensor {
 
@@ -231,33 +231,37 @@ struct clusterHead : public sensor {
         }
         for(auto triangle: triangles){
             pair <double,double> A,B,C;
-            double a, b c;
+            double a, b, c;
             double Rc;
             A = {triangle[0],triangle[1]};
             B = {triangle[2],triangle[3]};
             C = {triangle[4],triangle[5]};
             Rc = computeCircumradius(A, B, C);
             if(Rc > Rs){
-                a = distance(B[0], B[1], C[0], C[1]);
-                b = distance(A[0], A[1], C[0], C[1]);
-                C = distance(A[0], A[1], B[0], B[1]);
+                a = distance(B.first, B.second, C.first, C.second);
+                b = distance(A.first, A.second, C.first, C.second);
+                c = distance(A.first, A.second, B.first, B.second);
 
                 if(isObtuseTriangle(a,b,c)){
-                    if(!isFullyCovered(A[0],A[1],B[0],B[1],C[0],C[1],Rs)){
-                        hole_table.push_back(A[0],A[1],B[0],B[1],C[0],C[1]);
+                    if(!isFullyCovered(A.first,A.second,B.first,B.second,C.first,C.second,Rs)){
+                        hole_table.push_back({A.first,A.second,B.first,B.second,C.first,C.second});
                     }
                 }
                 else{
-                    hole_table.push_back(A[0],A[1],B[0],B[1],C[0],C[1]);
+                    hole_table.push_back({A.first,A.second,B.first,B.second,C.first,C.second});
                 }
             }
 
         
         }
+        return !hole_table.empty();
 
     }
     
-}
+};
+  
+  
+
 
 
 void sensor::updateFaultStatus() {
@@ -271,9 +275,8 @@ void sensor::updateFaultStatus() {
             }
         }
     }
-  
-  
-sensor BASE_STATION(0, 0, 50, 50);
+
+struct sensor BASE_STATION;
 
 struct network_stats{
     int BASE_STATION_X;
@@ -301,33 +304,50 @@ struct network_stats{
     double LEACH_NEW_percent_head[TOTAL_ROUNDS];
 };
 
+
 int main(int argc, char * argv[]){
     cout << "main" << endl;
     srand(time(0)); // Seed random generator
     NodeContainer nodes;
-    ns3Nodes.Create(28);
+    nodes.Create(30);
+    MobilityHelper mobility;
+    Ptr<ListPositionAllocator> positionAlloc = CreateObject<ListPositionAllocator>();
     
-    struct sensor *sensors = new struct sensor[18];
-    struct clusterHead *CHs = new struct clusterHead[9];
     
-    initializeNetwork(sensors,CHs)
-    ns3::AnimationInterface anim("mwsn.xml");
+    struct sensor *sensors = new struct sensor[25];
+    struct clusterHead *CHs = new struct clusterHead[5];
+   
+    
+    initializeNetwork(sensors,CHs);
+     
+    for (int i = 0; i < 25; i++) {
+    	positionAlloc->Add(Vector(sensors[i].xLoc, sensors[i].yLoc, 0.0));
+    }
+    for (int i = 0; i < 5; i++) {
+    	positionAlloc->Add(Vector(CHs[i].xLoc, CHs[i].yLoc, 0.0));
+    }
+    mobility.SetPositionAllocator(positionAlloc);
+    mobility.SetMobilityModel("ns3::ConstantPositionMobilityModel");
+    mobility.Install(nodes);
+    
+    AnimationInterface anim("mwsn.xml");  
+
     int i = 0;
     vector<tuple<int, uint8_t, uint8_t, uint8_t>> clusterColors = {
         {1, 0, 255, 0}, {2, 0, 0, 255}, {3, 255, 255, 0}, {4, 255, 165, 0}, {5, 128, 0, 128},
-        {6, 255, 192, 203}, {7, 0, 255, 255}, {8, 128, 128, 0}, {9, 139, 69, 19}
     };
-    for (; i < 18; i++) {
+    for (; i < 25; i++) {
         anim.SetConstantPosition(nodes.Get(i), sensors[i].xLoc, sensors[i].yLoc);
+        
         for (const auto& [clusterId, r, g, b] : clusterColors) {
                 if (sensors[i].clusterId == clusterId) {
                     anim.UpdateNodeColor(i, r, g, b);
                     break;
                 }
             }
-        cout<<i<<" - "<<sensors[i].xLoc<<" - "<<sensors[i].yLoc<<endl;
+        cout<<"sensors " << i<<" - "<<sensors[i].xLoc<<" - "<<sensors[i].yLoc<<endl;
     }
-    for (int j = 0; j < 9; j++){
+    for (int j = 0; j < 5; j++){
         anim.SetConstantPosition(nodes.Get(i), CHs[j].xLoc, CHs[j].yLoc);
         anim.UpdateNodeColor(i,0,0,0);
         cout<<i<<" - "<<CHs[j].xLoc<<" - "<<CHs[j].yLoc<<endl;
@@ -342,59 +362,47 @@ int main(int argc, char * argv[]){
 
 void initializeNetwork(struct sensor sensors[], struct clusterHead CHs[]) {  
 
-    int i = 0;  
-    srand((unsigned int) time(0));
-    double distance_X_new =0.0;
-    double distance_Y_new =0.0;
-    double distance_new =0.0;
-    int curr_id = 1;
-    int sensor_ctr = 0;
-    int cluster_id = 1;
-    for(i = 0; i < 9; i++) {  
-                CHs[i].id = curr_id;
-                CHs[i].clusterId = cluster_id;
-                curr_id++;
-                CHs[i].xLoc = rand() % NETWORK_X;  
-                CHs[i].yLoc = rand() % NETWORK_Y;
 
-                distance_X_new = CHs[i].xLoc - BASE_STATION.xLoc;  
-            	distance_Y_new = CHs[i].yLoc - BASE_STATION.yLoc;  
-            	distance_new = sqrt(pow(distance_X_new, 2) + pow(distance_Y_new, 2));  
-
-            	CHs[i].distance_BASE = distance_new;
-
-                CHs[i].lPeriods = 0;  
-                CHs[i].bCurrent = B_POWER;  
-                CHs[i].bPower = B_POWER;  
-                CHs[i].head = &CHs[i];
-                CHs[i].distance_current_head = 0;
-                for (int j = 0; j < 2; j++) {
-                    sensors[sensor_ctr].id = curr_id;
-                    sensors[sensor_ctr].clusterId = cluster_id;
-                    curr_id++;
-                    sensors[sensor_ctr].xLoc = CHs[i].xLoc + rand()%11;
-                    sensors[sensor_ctr].yLoc = CHs[i].yLoc + rand()%11;
-                    distance_X_new = sensors[sensor_ctr].xLoc - BASE_STATION.xLoc;  
-                    distance_Y_new = sensors[sensor_ctr].yLoc - BASE_STATION.yLoc;  
-                    distance_new = sqrt(pow(distance_X_new, 2) + pow(distance_Y_new, 2));
-                    sensors[sensor_ctr].distance_BASE = distance_new;
-                    sensors[sensor_ctr].lPeriods = 0;  
-                    sensors[sensor_ctr].bCurrent = B_POWER;  
-                    sensors[sensor_ctr].bPower = B_POWER;
-                    sensors[sensor_ctr].head = &CHs[i];
-                    distance_X_new = sensors[sensor_ctr].xLoc - CHs[i].xLoc;  
-                    distance_Y_new = sensors[sensor_ctr].yLoc - CHs[i].yLoc;  
-                    distance_new = sqrt(pow(distance_X_new, 2) + pow(distance_Y_new, 2));
-                    sensors[sensor_ctr].distance_current_head = distance_new;
-                    CH[i].members.push_back(&sensors[sensor_ctr]);
-                    CH[i].totalNodes++;
-                    sensor_ctr++;
-                }
-                cluster_id++;
-
-        		
+    CHs[0].id = 1;
+    CHs[0].clusterId = 1;
+    CHs[0].xLoc = 50.0;
+    CHs[0].yLoc = 50.0;
+    
+    CHs[1].id = 2;
+    CHs[1].clusterId = 2;
+    CHs[1].xLoc = 30.0;
+    CHs[1].yLoc = 70.0;
+    
+    CHs[2].id = 3;
+    CHs[2].clusterId = 3;
+    CHs[2].xLoc = 70.0;
+    CHs[2].yLoc = 70.0;
+    
+    CHs[3].id = 4;
+    CHs[3].clusterId = 4;
+    CHs[3].xLoc = 70.0;
+    CHs[3].yLoc = 30.0;
+    
+    CHs[4].id = 5;
+    CHs[4].clusterId = 5;
+    CHs[4].xLoc = 30.0;
+    CHs[4].yLoc = 30.0;
+    int id = 6;
+    int s_ctr = 0;
+    for(int i = 0; i < 5; i++){
+    	for(int j = 0; j < 5; j++){
+    	
+	    	sensors[s_ctr].id = id;
+	    	sensors[s_ctr].clusterId = i+1;
+	    	sensors[s_ctr].xLoc = CHs[i].xLoc - 10 + (rand()%20);
+	    	sensors[s_ctr].yLoc = CHs[i].yLoc - 10 + (rand()%20);
+	    	s_ctr++;
+	    	id++;
+	}
+    	
     }
-
+    
+    
 
        
 }// end initializeNetwork function  
