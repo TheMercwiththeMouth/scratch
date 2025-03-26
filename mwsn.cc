@@ -204,7 +204,7 @@ struct clusterHead : public sensor {
         faulty.push_back(faultNode);
         faultNodeCount++;  
         faultPercentage = (faultNodeCount / totalNodes) * 100.0;
-        if(faultNodeCount > 2) cout<<"Hole: " << checkForHole();
+        cout<<"Hole: " << checkForHole();
     }
 
     bool checkForHole() {
@@ -212,10 +212,12 @@ struct clusterHead : public sensor {
 
         if(coords.empty()){
             for(auto &node : members){
+            	
                 coords.push_back(node->xLoc);
                 coords.push_back(node->yLoc);
             }
         }
+        
         
         delaunator::Delaunator d(coords);
         vector<vector<double>> triangles;
@@ -236,12 +238,16 @@ struct clusterHead : public sensor {
             A = {triangle[0],triangle[1]};
             B = {triangle[2],triangle[3]};
             C = {triangle[4],triangle[5]};
+            //cout<<"A: "<<triangle[0]<<", "<<triangle[1]<<endl;
+            //cout<<"B: "<<triangle[2]<<", "<<triangle[3]<<endl;
+            //cout<<"C: "<<triangle[4]<<", "<<triangle[5]<<endl;
             Rc = computeCircumradius(A, B, C);
+            cout<<"circumradius: "<<Rc<<endl;
+	    cout<<"Sensor radius: "<<Rs<<endl;
             if(Rc > Rs){
                 a = distance(B.first, B.second, C.first, C.second);
                 b = distance(A.first, A.second, C.first, C.second);
                 c = distance(A.first, A.second, B.first, B.second);
-
                 if(isObtuseTriangle(a,b,c)){
                     if(!isFullyCovered(A.first,A.second,B.first,B.second,C.first,C.second,Rs)){
                         hole_table.push_back({A.first,A.second,B.first,B.second,C.first,C.second});
@@ -396,13 +402,13 @@ void initializeNetwork(struct sensor sensors[], struct clusterHead CHs[]) {
 	    	sensors[s_ctr].clusterId = i+1;
 	    	sensors[s_ctr].xLoc = CHs[i].xLoc - 10 + (rand()%20);
 	    	sensors[s_ctr].yLoc = CHs[i].yLoc - 10 + (rand()%20);
+	    	CHs[i].members.push_back(&sensors[s_ctr]);
 	    	s_ctr++;
 	    	id++;
+	    	
 	}
+	cout<<"hole? "<< CHs[i].checkForHole()<<endl;
     	
     }
-    
-    
-
        
 }// end initializeNetwork function  
